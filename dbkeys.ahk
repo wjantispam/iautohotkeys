@@ -7,13 +7,6 @@
 ;   &	An ampersand may be used between any two keys or mouse buttons to combine them into a custom hotkey.
 SetKeyDelay,0
 
-getDB() {
-    InputBox, UserInput, DB Instance, Enter DB Instance name
-    if ErrorLevel
-        MsgBox, CANCEL was pressed.
-    return %UserInput%
-}
-
 ; Expression (:=) syntax (recommended) and this is how to handle long lines. https://www.autohotkey.com/docs/Scripts.htm#continuation
 Find_Biggest_Database := "
 (
@@ -43,8 +36,8 @@ Find_Table_Count_Data_Index_Size_With_Filters := "
     concat(round(sum(index_length)/(1024*1024*1024),2),'G') idx, 
     concat(round(sum(data_length{+}index_length)/(1024*1024*1024),2),'G') total_size, 
     round(sum(index_length)/sum(data_length),2) idxfrac 
-    FROM information_schema.TABLES WHERE table_name LIKE 'Leg' 
-    and table_name LIKE TABLE_SCHEMA = 'RiskDB';
+    FROM information_schema.TABLES 
+    WHERE table_name LIKE = '_USERINPUT_';
 )"
 
 Engine_Sizes := "
@@ -62,32 +55,56 @@ Table_Sizes := "
 (
     SELECT TABLE_NAME, CONCAT(ROUND((DATA_LENGTH{+}INDEX_LENGTH)/(1024*1024),2),'M') AS TABLE_SIZE 
     FROM information_schema.TABLES 
-    WHERE table_schema='mysql';
+    WHERE table_schema='_USERINPUT_';
 )"
 
+; The second line is appended to the first because it begins with a comma. See https://www.autohotkey.com/docs/Scripts.htm
 Email := {"1-Thanks"       : "test1"
         , "2-No thanks"    : "test2"}
 
-; The second line is appended to the first because it begins with a comma. See https://www.autohotkey.com/docs/Scripts.htm
-Sub := {"Find total number of tables, rows, total data in index size" : Find_Table_Count_Data_Index_Size
-        ,"above with filters"       : Find_Table_Count_Data_Index_Size_With_Filters
-        ,"Find biggest databases"   : Find_Biggest_Database
-        ,"Find all table sizes"     : Table_Sizes
-        ,"Find engine Sizes"        : Engine_Sizes}
+dbmenuItems := []
+dbmenuItems["Table data index"] := Find_Table_Count_Data_Index_Size
+dbmenuItems["Table data index FOR TABLE_NAME"] := Find_Table_Count_Data_Index_Size_With_Filters 
+dbmenuItems["Biggest Database"] := Find_Biggest_Database
+dbmenuItems["Table sizes FOR TABLE_SCHEMA"] := Table_Sizes
+dbmenuItems["Engine sizes"] := Engine_Sizes
+
 ;; Syntax: 
 ;; Menu, MenuName, Add [,MenuItemName, LabelOrSubmenu, Options]
 For menuItem, string in Email
     Menu, MyMenu, Add, %menuItem%, MenuHandler2
-For menuItem, string in Sub
-    Menu, Sub, Add, %menuItem%, MenuHandler2
-Menu, MyMenu, Add, Click for DB Stats, :Sub
+
+For menuItem, _ in dbmenuItems
+    Menu, dbmenuItems, Add, %menuItem%, MenuHandler
+Menu, MyMenu, Add, Click for DB Stats, :dbmenuItems
+
+return ;tells the script to go idle and wait for user input
+
+MenuHandler:
+; You will somehow need %% around A_ThisMenu to retrive the varialble but don't need it on A_ThisMenuItem
+if Instr(%A_ThisMenu%[A_ThisMenuItem], "_USERINPUT_") and !ErrorLevel {
+        if (getDB(userInput)) {
+            command := % %A_ThisMenu%[A_ThisMenuItem] ;get the command string from the dbmenuItems array
+            sendinput % RegExReplace(command,"_USERINPUT_",userInput)   ;send the command but also try and replace _USERINPUT_ with actual user input
+        }
+    }
+Else
+    SendInput % %A_ThisMenu%[A_ThisMenuItem]  
+Return
 
 MenuHandler2:
-if ! ErrorLevel
     SendInput % %A_ThisMenu%[A_ThisMenuItem]
 Return
 
-
+;byref UserInput means it's treated as input and output variable, so it gets updated in this function and returned as well
+getDB(byref UserInput) {
+    InputBox, UserInput, Database, Enter database key
+    if (ErrorLevel) {
+        MsgBox, CANCEL was pressed.
+		return 0
+	}
+    return 1
+}
 ;------------------------------------------------------------------------------------------------------------
 ; Alt+r to Save this script & automatically reload it
 ;   Somehow the MsgBox doesn't work, so I use ]t to test if the change has been updated
