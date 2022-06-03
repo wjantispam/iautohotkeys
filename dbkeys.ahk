@@ -7,6 +7,13 @@
 ;   &	An ampersand may be used between any two keys or mouse buttons to combine them into a custom hotkey.
 SetKeyDelay,0
 
+getDB() {
+    InputBox, UserInput, DB Instance, Enter DB Instance name
+    if ErrorLevel
+        MsgBox, CANCEL was pressed.
+    return %UserInput%
+}
+
 ; Expression (:=) syntax (recommended) and this is how to handle long lines. https://www.autohotkey.com/docs/Scripts.htm#continuation
 Find_Biggest_Database := "
 (
@@ -15,7 +22,8 @@ Find_Biggest_Database := "
     concat(round(sum(index_length)/(1024*1024*1024),2),'G') idx,
     concat(round(sum(data_length{+}index_length)/(1024*1024*1024),2),'G') total_size,
     round(sum(index_length)/sum(data_length),2) idxfrac 
-    FROM information_schema.TABLES GROUP BY table_schema ORDER BY sum(data_length{+}index_length) DESC LIMIT 10;
+    FROM information_schema.TABLES GROUP BY table_schema 
+    ORDER BY sum(data_length{+}index_length) DESC LIMIT 10;
 )"
 
 Find_Table_Count_Data_Index_Size := "
@@ -35,7 +43,8 @@ Find_Table_Count_Data_Index_Size_With_Filters := "
     concat(round(sum(index_length)/(1024*1024*1024),2),'G') idx, 
     concat(round(sum(data_length{+}index_length)/(1024*1024*1024),2),'G') total_size, 
     round(sum(index_length)/sum(data_length),2) idxfrac 
-    FROM information_schema.TABLES WHERE table_name LIKE 'Leg' and table_name LIKE TABLE_SCHEMA = 'RiskDB';
+    FROM information_schema.TABLES WHERE table_name LIKE 'Leg' 
+    and table_name LIKE TABLE_SCHEMA = 'RiskDB';
 )"
 
 Engine_Sizes := "
@@ -53,7 +62,7 @@ Table_Sizes := "
 (
     SELECT TABLE_NAME, CONCAT(ROUND((DATA_LENGTH{+}INDEX_LENGTH)/(1024*1024),2),'M') AS TABLE_SIZE 
     FROM information_schema.TABLES 
-    WHERE table_schema='database_name';
+    WHERE table_schema='mysql';
 )"
 
 Email := {"1-Thanks"       : "test1"
@@ -67,13 +76,14 @@ Sub := {"Find total number of tables, rows, total data in index size" : Find_Tab
         ,"Find engine Sizes"        : Engine_Sizes}
 ;; Syntax: 
 ;; Menu, MenuName, Add [,MenuItemName, LabelOrSubmenu, Options]
-For menuItem, string in Sub
-    Menu, Sub, Add, %menuItem%, MenuHandler2
 For menuItem, string in Email
     Menu, MyMenu, Add, %menuItem%, MenuHandler2
+For menuItem, string in Sub
+    Menu, Sub, Add, %menuItem%, MenuHandler2
 Menu, MyMenu, Add, Click for DB Stats, :Sub
 
 MenuHandler2:
+if ! ErrorLevel
     SendInput % %A_ThisMenu%[A_ThisMenuItem]
 Return
 
